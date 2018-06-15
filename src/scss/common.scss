@@ -1,0 +1,130 @@
+@import "var";
+
+$borderColor: #999;
+
+.editor-content-box {
+    @include full;
+}
+.editor-box {
+    position: absolute;
+    left: 16px;
+    top: 16px;
+    width: 800px;
+    height: 500px;
+    border: 1px solid #999;
+    user-select: none;
+}
+.parent {
+    position: relative;
+    width: 300px;
+    height: 300px;
+    border: 1px solid #999;
+    overflow: hidden;
+}
+.child {
+    width: 100px;
+    height: 100px;
+    position: absolute;
+    border: 1px solid #999;
+    cursor: move;
+    background-color: #fff;
+    text-align: center;
+    &.active {
+        //border: 1px solid #f00;
+    }
+    .mask {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+    }
+    .input {
+        width: 100%;
+        height: 100%;
+        border: none;
+        outline: none;
+        padding: 16px;
+    }
+    .img-content {
+        display: block;
+        width: 100%;
+        height: 100%;
+        user-select: none;
+    }
+}
+.tool-box {
+    position: absolute;
+    top: 0;
+    right: 0;
+    width: 320px;
+    bottom: 0;
+    padding: 16px;
+    overflow: auto;
+    border-left: 1px solid $borderColor;
+    background-color: #fff;
+    .input-x {
+        margin-right: 16px;
+        width: 80px;
+    }
+    .input-y {
+        width: 80px;
+    }
+}
+.context-menu {
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 320px;
+}
+
+.handler-box {
+    //position: absolute;
+    //left: 0;
+    //top: 0;
+    //right: 0;
+    //bottom: 0;
+
+    //background-color: rgba(0, 0, 0, .2);
+}
+.resize-box {
+    @include full;
+    border: 1px dashed #09c;
+    background-color: rgba(255, 255, 255, .2);
+    .handler {
+        position: absolute;
+        width: 12px;
+        height: 12px;
+        border: 1px solid #09c;
+        background-color: #09c;
+        border-radius: 50%;
+    }
+    .center {
+        @include full;
+        cursor: move;
+    }
+    .handler-right {
+        right: -6px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: w-resize;
+    }
+    .handler-bottom {
+        left: 50%;
+        bottom: -6px;
+        transform: translateX(-50%);
+        cursor: n-resize;
+    }
+    .handler-top {
+        left: 50%;
+        top: -6px;
+        transform: translateX(-50%);
+        cursor: n-resize;
+    }
+    .handler-left {
+        left: -6px;
+        top: 50%;
+        transform: translateY(-50%);
+        cursor: w-resize;
+    }
+}

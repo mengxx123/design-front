@@ -19,3 +19,11 @@ $color_9: rgba(0,0,0,.54);
         overflow: hidden;
     }
 }
+
+@mixin full {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+}
