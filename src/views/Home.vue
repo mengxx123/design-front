@@ -1,26 +1,43 @@
 <template>
-    <my-page title="首页">
+    <my-page class="page-editor" title="首页">
+        <div class="tool-box">
+            <ui-raised-button label="删除" @click="remove" />
+            <ui-raised-button label="点这里" ref="button" @click="toggle"/>
+            <ui-popover :trigger="trigger" :open="open" @close="handleClose">
+                <ui-menu>
+                    <ui-menu-item title="新建" />
+                    <ui-menu-item title="打开" />
+                    <ui-menu-item title="另存为" />
+                    <ui-menu-item title="Help" />
+                    <ui-menu-item title="Sign out" />
+                </ui-menu>
+            </ui-popover>
+        </div>
         <div class="editor-box">
-            <div class="editor-content-box">
+            <div ref="editor" class="editor-content-box"
+                 @click="editorClick($event)"
+                 @mousedown="editorMouseDown($event)">
                 <div ref="parent" id="parent" class="parent"
                      @contextmenu="contextmenu($event)"
+                     :style="docStyle"
                     @click="parentClick($event)">
                     <div id="child" class="child"
                          v-for="elem in elems"
                          :style="elemStyle(elem)"
                          :class="elemClass(elem)"
-                         @contextmenu="elemContextmenu($event, elem)"
+                         @contextmenu.stop="elemContextmenu($event, elem)"
                          @click.stop="elemClick($event, elem)"
                          @dblclick="doubleClick($event, elem)"
-                         @mousedown="mouseDown($event, elem)"
+                         @mousedown.stop="mouseDown($event, elem)"
                          @mousemove="mouseMove($event, elem)"
                          @mouseup="mouseUp($event, elem)">
                         <div class="mask"></div>
                         <input class="input" v-model="elem.text" v-if="elem.edit" @blur="blur($event, elem)">
                         <span :style="{'line-height': elem.height + 'px'}" v-if="elem.type === 'text' && !elem.edit">{{ elem.text }}</span>
                         <img class="img-content" :src="elem.image" v-if="elem.type === 'image'"/>
+                        <handler ref="handler" :data="handlerData" :parentYY="parentY" :parentXX="parentX" v-if="curElem && curElem.id === elem.id" @change="onChange" />
                     </div>
-                    <!-- 辅助线 -->
+                    <!-- lines -->
                     <div class="lines" v-if="lineVisible">
                         <div class="line-box" :class="lineClass(line)" v-for="line in lines"
                             @mousedown="lineMouseDown($event, line)"
@@ -28,21 +45,37 @@
                             <div class="line"></div>
                         </div>
                     </div>
+                    <!-- selections -->
+                    <div class="doc-resize" @mousedown.stop="resizeDown($event)"></div>
                 </div>
-                <handler ref="handler" :data="handlerData" v-if="curElem" @change="onChange" />
+                <div class="selection" v-if="selection.visible" :style="selectionStyle"></div>
+                <div class="doc-line" :style="docLineStyle" v-if="docLine.visible"></div>
             </div>
         </div>
-        <div class="tool-box">
+        <div class="attr-box">
             <div v-if="curElem">
                 <div class="form-item">
-                    <ui-text-field class="input-x" v-model="curElem.x" label="X" type="number" />
-                    <ui-text-field class="input-y" v-model="curElem.y" label="Y" type="number" />
+                    <ui-text-field class="input-small" v-model="curElem.x" label="X" type="number" />
+                    <span class="unit mar-r">px</span>
+                    <ui-text-field class="input-small" v-model="curElem.y" label="Y" type="number" />
+                    <span class="unit">px</span>
                 </div>
                 <div class="form-item">
-                    <ui-text-field v-model="curElem.width" label="宽" type="number" />
+                    <ui-text-field class="input-small" v-model="curElem.width" label="宽度" type="number" />
+                    <span class="unit mar-r">px</span>
+                    <ui-text-field class="input-small" v-model="curElem.height" label="高度" type="number" />
+                    <span class="unit">px</span>
                 </div>
                 <div class="form-item">
-                    <ui-text-field v-model="curElem.height" label="高" type="number" />
+                    <ui-text-field class="input-small" v-model="curElem.rotate" label="角度" type="number" />
+                    <span class="unit mar-r">°</span>
+                    <ui-icon-button tooltip="旋转 90°">
+                        <ui-icon value="rotate_90_degrees_ccw" style="transform: scaleX(-1)" @click="rotate90()" />
+                    </ui-icon-button>
+                    <ui-icon-button icon="flip" tooltip="水平翻转" @click="flipX" />
+                    <ui-icon-button tooltip="垂直翻转" @click="flipY">
+                        <ui-icon value="flip" style="transform: rotate(-270deg)" />
+                    </ui-icon-button>
                 </div>
                 <div class="form-item">
                     <ui-text-field v-model="curElem.text" label="文本" type="number" />
@@ -55,7 +88,7 @@
             <div>menuX: {{ menuX }}</div>
             <div>lines.length: {{ lines.length }}</div>
         </div>
-        <div class="context-menu" v-if="menuVisiable" :style="menuStyle" @click.stop="doNothing">
+        <div class="context-menu" v-if="menuVisible" :style="menuStyle" @click.stop="doNothing">
             <ui-menu>
                 <ui-menu-item title="Maps"/>
                 <ui-menu-item title="Books"/>
@@ -69,17 +102,30 @@
                     <ui-divider />
                     <ui-menu-item title="清除辅助线" inset @click="clearLine" />
                 </ui-menu-item>
-                <ui-menu-item title="粘贴"/>
+                <ui-menu-item title="粘贴" @click="pasteElem"/>
             </ui-menu>
         </div>
         <div class="context-menu" v-if="itemMenuVisible" :style="itemMenuStyle" @click.stop="doNothing">
             <ui-menu>
-                <ui-menu-item title="剪切"/>
-                <ui-menu-item title="复制"/>
-                <ui-menu-item title="粘贴"/>
-                <ui-menu-item title="清空"/>
+                <ui-menu-item title="剪切" @click="cutElem"/>
+                <ui-menu-item title="复制" @click="copyElem"/>
+                <ui-menu-item title="删除" @click="removeElem"/>
+                <ui-menu-item title="顺序" rightIcon="keyboard_arrow_right">
+                    <ui-menu-item title="置于顶层" @click="moveIndexTop" />
+                    <ui-menu-item title="上升一层" @click="moveIndexUp"/>
+                    <ui-menu-item title="下降一层" @click="moveIndexDown" />
+                    <ui-menu-item title="移至底层" @click="moveIndexBottom" />
+                </ui-menu-item>
             </ui-menu>
         </div>
+        <ui-drawer class="layer-box" right :open="layerVisible" :docked="false" @close="toggleLayer()">
+            <ui-appbar title="图层"></ui-appbar>
+            <ul class="layer-list">
+                <li class="item" v-for="elem in elems">
+                    {{ elem.text }}
+                </li>
+            </ul>
+        </ui-drawer>
     </my-page>
 </template>
 
@@ -87,7 +133,17 @@
     export default {
         data () {
             return {
+                open: false,
+                trigger: null,
+                //
                 curElem: null,
+                data: {
+                    version: '1.0.0',
+                    info: {
+                        width: 400,
+                        height: 500
+                    }
+                },
                 elems: [
                     {
                         type: 'text',
@@ -96,7 +152,10 @@
                         x: 0,
                         y: 0,
                         width: 100,
-                        height: 100
+                        height: 100,
+                        rotate: 0,
+                        scaleX: 1,
+                        scaleY: 1
                     },
                     {
                         type: 'text',
@@ -105,7 +164,10 @@
                         x: 0,
                         y: 100,
                         width: 200,
-                        height: 100
+                        height: 100,
+                        rotate: 0,
+                        scaleX: 1,
+                        scaleY: 1
                     },
                     {
                         id: '3',
@@ -115,6 +177,9 @@
                         y: 0,
                         width: 100,
                         height: 100,
+                        rotate: 45,
+                        scaleX: 1,
+                        scaleY: 1,
                         image: 'https://ss0.bdstatic.com/5aV1bjqh_Q23odCf/static/superman/img/logo_top_ca79a146.png'
                     }
                 ],
@@ -125,7 +190,7 @@
                     height: 100
                 },
                 // context menu
-                menuVisiable: false,
+                menuVisible: false,
                 menuX: 200,
                 menuY: 100,
                 // item context menu
@@ -144,6 +209,26 @@
 //                        position: 200
 //                    }
                 ],
+                // selection
+                selection: {
+                    visible: false,
+                    x: 50,
+                    y: 20,
+                    x2: 300,
+                    y2: 300
+                },
+//                docLine: null,
+                docLine: {
+                    visible: false,
+                    x: 100,
+                    y: 100,
+                    x2: 300,
+                    y2: 400
+                },
+                // 复制粘贴
+                copyedElem: null,
+                // later
+                layerVisible: false,
                 page: {
                     menu: [
                         {
@@ -156,6 +241,31 @@
             }
         },
         computed: {
+            docLineStyle() {
+                if (!this.docLine) {
+                    return {}
+                }
+                return {
+                    top: this.docLine.y + 'px',
+                    left: this.docLine.x + 'px',
+                    width: (this.docLine.x2 - this.docLine.x) + 'px',
+                    height: (this.docLine.y2 - this.docLine.y) + 'px'
+                }
+            },
+            docStyle() {
+                return {
+                    width: this.data.info.width + 'px',
+                    height: this.data.info.height + 'px'
+                }
+            },
+            selectionStyle() {
+                return {
+                    top: this.selection.y + 'px',
+                    left: this.selection.x + 'px',
+                    width: (this.selection.x2 - this.selection.x) + 'px',
+                    height: (this.selection.y2 - this.selection.y) + 'px'
+                }
+            },
             menuStyle() {
                 return {
                     top: this.menuY + 'px',
@@ -167,16 +277,34 @@
                     top: this.itemMenuY + 'px',
                     left: this.itemMenuX + 'px'
                 }
+            },
+            parentY() {
+                return this.$refs.parent.getBoundingClientRect().top
+            },
+            parentX() {
+                return this.$refs.parent.getBoundingClientRect().left
             }
         },
         mounted() {
-//            this.selectElem(this.elems[1])
+            this.trigger = this.$refs.button.$el
+            //
+            this.selectElem(this.elems[1])
 //            let $parent = document.getElementById('parent')
 //            let $child = document.getElementById('parent')
         },
         destroyed() {
         },
         methods: {
+            toggle () {
+                this.open = !this.open
+            },
+            handleClose (e) {
+                this.open = false
+            },
+            //
+            toggleLayer() {
+                this.layerVisible = !this.layerVisible
+            },
             toggleLineVisible() {
                 this.lineVisible = !this.lineVisible
             },
@@ -204,11 +332,14 @@
             selectElem(elem) {
                 this.curElem = elem
                 this.$nextTick(() => {
-                    this.$refs.handler.setData({
+                    console.log('refs')
+                    console.log(this.$refs.handler)
+                    this.$refs.handler[0].setData({
                         x: this.curElem.x,
                         y: this.curElem.y,
                         width: this.curElem.width,
-                        height: this.curElem.height
+                        height: this.curElem.height,
+                        rotate: this.curElem.rotate
                     })
                 })
 //                this.handlerData.x = this.curElem.x
@@ -221,13 +352,15 @@
                 this.curElem.y = data.y
                 this.curElem.width = data.width
                 this.curElem.height = data.height
+                this.curElem.rotate = data.rotate
             },
             elemStyle(elem) {
                 return {
                     left: elem.x + 'px',
                     top: elem.y + 'px',
                     width: elem.width + 'px',
-                    height: elem.height + 'px'
+                    height: elem.height + 'px',
+                    transform: `rotate(${elem.rotate || 0}deg) scale(${elem.scaleX || 1}, ${elem.scaleY || 1})`
                 }
             },
             elemClass(elem) {
@@ -242,14 +375,48 @@
             blur(e, elem) {
                 elem.edit = false
             },
-            parentClick(e) {
+            editorClick(e) {
                 e.stopPropagation()
                 e.preventDefault()
                 this.curElem = null
                 console.log('点击空白')
+                this.menuVisible = false
+                this.itemMenuVisible = false
+            },
+            parentClick(e) {
+//                e.stopPropagation()
+//                e.preventDefault()
+//                this.curElem = null
+//                console.log('点击空白')
+//                this.menuVisible = false
+//                this.itemMenuVisible = false
             },
             elemClick(e, elem) {
+                console.log(e)
                 console.log('点击了元素' + elem.id)
+            },
+            editorMouseDown(e) {
+                console.log('mouse down')
+
+                this.selection.x = e.pageX - this.$refs.editor.getBoundingClientRect().left
+                this.selection.y = e.pageY - this.$refs.editor.getBoundingClientRect().top
+//                this.selection.x2 = this.selection.x
+//                this.selection.y2 = this.selection.y
+
+                let mouseMove
+                let mouseUp
+//                let isDown = true
+                document.addEventListener('mousemove', mouseMove = e => {
+                    this.selection.visible = true
+                    this.selection.x2 = e.pageX - this.$refs.editor.getBoundingClientRect().left
+                    this.selection.y2 = e.pageY - this.$refs.editor.getBoundingClientRect().top
+                })
+                document.addEventListener('mouseup', mouseUp = e => {
+                    this.selection.visible = false
+                    console.log('up')
+                    document.removeEventListener('mousemove', mouseMove)
+                    document.removeEventListener('mouseup', mouseUp)
+                })
             },
             mouseDown(e, elem) {
                 this.isDown = true
@@ -272,27 +439,75 @@
             },
             contextmenu(e) {
                 console.log('菜单')
-                this.menuVisiable = true
+                this.menuVisible = true
                 this.menuX = e.pageX
                 this.menuY = e.pageY
                 e.returnValue = false
-                document.addEventListener('click', this._docClick = e => {
-                    document.removeEventListener('click', this._docClick)
-                    this.menuVisiable = false
+                let docClick
+                document.addEventListener('click', docClick = e => {
+                    document.removeEventListener('click', docClick)
+                    this.menuVisible = false
                 })
                 return false
             },
-            elemContextmenu(e) {
-                console.log('菜单')
+            elemContextmenu(e, elem) {
+                console.log('元素菜单')
                 this.itemMenuVisible = true
                 this.itemMenuX = e.pageX
                 this.itemMenuY = e.pageY
                 e.returnValue = false
-                document.addEventListener('click', this._docClick = e => {
-                    document.removeEventListener('click', this._docClick)
+                let docClick
+                document.addEventListener('click', docClick = e => {
+                    document.removeEventListener('click', docClick)
                     this.itemMenuVisible = false
                 })
+                this.menuVisible = false
                 return false
+            },
+            cutElem() {
+                this.pasteType = 'cut'
+                this.copyedElem = this.curElem
+                for (let i = 0; i < this.elems.length; i++) {
+                    if (this.elems[i].id === this.curElem.id) {
+                        this.elems.splice(i, 1)
+                        break
+                    }
+                }
+                this.itemMenuVisible = false
+            },
+            copyElem() {
+                this.pasteType = 'copy'
+                this.copyedElem = this.curElem
+                this.itemMenuVisible = false
+            },
+            pasteElem() {
+                let x = this.copyedElem.x
+                let y = this.copyedElem.y
+                if (this.pasteType === 'copy') {
+                    x += 16
+                    y += 16
+                }
+                // TODO
+                this.elems.push({
+                    type: this.copyedElem.type,
+                    id: new Date().getTime(),
+                    text: this.copyedElem.text,
+                    x: x,
+                    y: y,
+                    width: this.copyedElem.width,
+                    height: this.copyedElem.height,
+                    image: this.copyedElem.image
+                })
+                this.menuVisible = false
+            },
+            removeElem() {
+                for (let i = 0; i < this.elems.length; i++) {
+                    if (this.elems[i].id === this.curElem.id) {
+                        this.elems.splice(i, 1)
+                        break
+                    }
+                }
+                this.itemMenuVisible = false
             },
             remove() {
                 for (let i = 0; i < this.elems.length; i++) {
@@ -347,6 +562,29 @@
                     document.removeEventListener('mouseup', mouseUp)
                 })
             },
+            resizeDown(e) {
+                let mouseMove
+                let mouseUp
+//                let isDown = true
+                this.docLine.x = this.$refs.parent.getBoundingClientRect().left - this.$refs.editor.getBoundingClientRect().left
+                this.docLine.y = this.$refs.parent.getBoundingClientRect().top - this.$refs.editor.getBoundingClientRect().top
+                this.docLine.x2 = this.docLine.x + this.data.info.width
+                this.docLine.y2 = this.docLine.y + this.data.info.height
+                this.docLine.visible = true
+                document.addEventListener('mousemove', mouseMove = e => {
+                    console.log('moveeeeeeeeeee')
+                    this.docLine.x2 = e.pageX - this.$refs.editor.getBoundingClientRect().left
+                    this.docLine.y2 = e.pageY - this.$refs.editor.getBoundingClientRect().top
+                })
+                document.addEventListener('mouseup', mouseUp = e => {
+                    console.log('up')
+                    document.removeEventListener('mousemove', mouseMove)
+                    document.removeEventListener('mouseup', mouseUp)
+                    this.docLine.visible = false
+                    this.data.info.width = this.docLine.x2 - this.docLine.x
+                    this.data.info.height = this.docLine.y2 - this.docLine.y
+                })
+            },
             addVerticalLine() {
                 this.lines.push({
                     type: 'vertical',
@@ -358,6 +596,51 @@
                     type: 'horizontal',
                     position: this.menuY - this.$refs.parent.getBoundingClientRect().top
                 })
+            },
+            moveIndexTop() {
+                for (let i = 0; i < this.elems.length; i++) {
+                    if (this.elems[i].id === this.curElem.id) {
+                        this.elems.splice(i, 1)
+                    }
+                }
+                this.elems.push(this.curElem)
+            },
+            moveIndexBottom() {
+                for (let i = 0; i < this.elems.length; i++) {
+                    if (this.elems[i].id === this.curElem.id) {
+                        this.elems.splice(i, 1)
+                    }
+                }
+                this.elems.unshift(this.curElem)
+            },
+            moveIndexUp() {
+                let idx
+                for (let i = 0; i < this.elems.length; i++) {
+                    if (this.elems[i].id === this.curElem.id) {
+                        idx = i
+                        this.elems.splice(i, 1)
+                    }
+                }
+                this.elems.splice(idx + 1, 0, this.curElem)
+            },
+            moveIndexDown() {
+                let idx
+                for (let i = 0; i < this.elems.length; i++) {
+                    if (this.elems[i].id === this.curElem.id) {
+                        idx = i
+                        this.elems.splice(i, 1)
+                    }
+                }
+                this.elems.splice(idx - 1, 0, this.curElem)
+            },
+            rotate90() {
+                this.curElem.rotate = (this.curElem.rotate + 90) % 360
+            },
+            flipX() {
+                this.curElem.scaleX *= -1
+            },
+            flipY() {
+                this.curElem.scaleY *= -1
             }
         }
     }
