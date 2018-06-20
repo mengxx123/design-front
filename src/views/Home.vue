@@ -1,19 +1,58 @@
 <template>
     <my-page class="page-editor" title="首页">
         <div class="tool-box">
-            <ui-raised-button label="删除" @click="remove" />
-            <ui-raised-button label="点这里" ref="button" @click="toggle"/>
-            <ui-popover :trigger="trigger" :open="open" @close="handleClose">
-                <ui-menu>
-                    <ui-menu-item title="新建" />
-                    <ui-menu-item title="打开" />
-                    <ui-menu-item title="另存为" />
-                    <ui-menu-item title="Help" />
-                    <ui-menu-item title="Sign out" />
-                </ui-menu>
-            </ui-popover>
+            <div class="editor-tools">
+                <ui-raised-button label="删除" @click="remove" />
+                <ui-raised-button label="点这里" ref="button" @click="toggle"/>
+                <ui-popover :trigger="trigger" :open="open" @close="handleClose">
+                    <ui-menu>
+                        <ui-menu-item title="新建" />
+                        <ui-menu-item title="打开" />
+                        <ui-menu-item title="另存为" />
+                        <ui-menu-item title="重命名" />
+                        <ui-menu-item title="打印" />
+                    </ui-menu>
+                </ui-popover>
+                <ui-icon-button tooltip="添加文字" @click="addText">
+                    <ui-icon class="icon" value="title" />
+                </ui-icon-button>
+                <ui-icon-button tooltip="添加图片" @click="imageVisible = true">
+                    <ui-icon class="icon" value="image" />
+                </ui-icon-button>
+                <ui-icon-button tooltip="左对齐" @click="alignLeft">
+                    <ui-icon class="icon" value="format_align_left" />
+                </ui-icon-button>
+                <ui-icon-button tooltip="右对齐" @click="alignRight">
+                    <ui-icon class="icon" value="format_align_right" />
+                </ui-icon-button>
+                <ui-icon-button tooltip="水平居中" @click="alignCenter">
+                    <ui-icon class="icon" value="format_align_center" />
+                </ui-icon-button>
+
+                <ui-icon-button tooltip="上对齐" @click="alignTop">
+                    <ui-icon class="icon" value="vertical_align_top" />
+                </ui-icon-button>
+                <ui-icon-button tooltip="下对齐" @click="alignBottom">
+                    <ui-icon class="icon" value="vertical_align_bottom" />
+                </ui-icon-button>
+                <ui-icon-button tooltip="垂直居中" @click="alignMiddle">
+                    <ui-icon class="icon" value="vertical_align_center" />
+                </ui-icon-button>
+
+
+                <quick-popover>
+                    <ui-raised-button label="点这里" slot="element"/>
+                    <ui-menu slot="popover">
+                        <ui-menu-item title="Refresh" />
+                        <ui-menu-item title="Send feedback" />
+                        <ui-menu-item title="Settings" />
+                        <ui-menu-item title="Help" />
+                        <ui-menu-item title="Sign out" />
+                    </ui-menu>
+                </quick-popover>
+            </div>
         </div>
-        <div class="editor-box">
+        <div class="editor-box" :style="{right: attrBoxWidth + 'px'}">
             <div ref="editor" class="editor-content-box"
                  @click="editorClick($event)"
                  @mousedown="editorMouseDown($event)">
@@ -22,8 +61,8 @@
                      :style="docStyle"
                     @click="parentClick($event)">
                     <div id="child" class="child"
-                         v-for="elem in elems"
-                         :style="elemStyle(elem)"
+                         v-for="elem, index in elems"
+                         :style="elemStyle(elem, index)"
                          :class="elemClass(elem)"
                          @contextmenu.stop="elemContextmenu($event, elem)"
                          @click.stop="elemClick($event, elem)"
@@ -40,7 +79,8 @@
                     <!-- lines -->
                     <div class="lines" v-if="lineVisible">
                         <div class="line-box" :class="lineClass(line)" v-for="line in lines"
-                            @mousedown="lineMouseDown($event, line)"
+                             @click.stop="doNothing"
+                            @mousedown.stop="lineMouseDown($event, line)"
                              :style="lineStyle(line)">
                             <div class="line"></div>
                         </div>
@@ -52,7 +92,8 @@
                 <div class="doc-line" :style="docLineStyle" v-if="docLine.visible"></div>
             </div>
         </div>
-        <div class="attr-box">
+        <div class="attr-box" :style="{width: attrBoxWidth + 'px'}">
+            <div v-if="!curElem">请选择元素进行编辑~</div>
             <div v-if="curElem">
                 <div class="form-item">
                     <ui-text-field class="input-small" v-model="curElem.x" label="X" type="number" />
@@ -81,12 +122,11 @@
                     <ui-text-field v-model="curElem.text" label="文本" type="number" />
                 </div>
                 <ui-raised-button label="删除" @click="remove" />
+
+                <ui-sub-header>边框</ui-sub-header>
+                <ui-slider v-model="curElem.borderWidth" class="demo-slider"/>
             </div>
-            <br>
-            <ui-raised-button label="添加文字" @click="addText" />
-            <ui-raised-button label="添加图片" @click="addImage" />
-            <div>menuX: {{ menuX }}</div>
-            <div>lines.length: {{ lines.length }}</div>
+            <div class="handler" @mousedown="handlerMouseDown($event)"></div>
         </div>
         <div class="context-menu" v-if="menuVisible" :style="menuStyle" @click.stop="doNothing">
             <ui-menu>
@@ -126,6 +166,19 @@
                 </li>
             </ul>
         </ui-drawer>
+        <!--<div class="print-box"></div>-->
+        <ui-drawer class="image-box" right :open="imageVisible" :docked="true" @close="toggleImage()">
+            <ui-appbar title="图片">
+                <ui-icon-button icon="close" slot="left" @click="imageVisible = false" />
+            </ui-appbar>
+            <div class="body">
+                <ul class="image-list">
+                    <li class="item" v-for="img in images">
+                        <img class="image" :src="img" @click="addImage(img)">
+                    </li>
+                </ul>
+            </div>
+        </ui-drawer>
     </my-page>
 </template>
 
@@ -133,6 +186,16 @@
     export default {
         data () {
             return {
+                // image list
+                images: [
+                    '/static/img/img_1.jpg',
+                    '/static/img/img_2.svg',
+                    '/static/img/img_3.jpg',
+                    '/static/img/img_4.jpg'
+                ],
+                imageVisible: false,
+                //
+                attrBoxWidth: 320,
                 open: false,
                 trigger: null,
                 //
@@ -295,6 +358,9 @@
         destroyed() {
         },
         methods: {
+            toggleImage() {
+                this.imageVisible = !this.imageVisible
+            },
             toggle () {
                 this.open = !this.open
             },
@@ -354,13 +420,15 @@
                 this.curElem.height = data.height
                 this.curElem.rotate = data.rotate
             },
-            elemStyle(elem) {
+            elemStyle(elem, index) {
                 return {
                     left: elem.x + 'px',
                     top: elem.y + 'px',
                     width: elem.width + 'px',
                     height: elem.height + 'px',
-                    transform: `rotate(${elem.rotate || 0}deg) scale(${elem.scaleX || 1}, ${elem.scaleY || 1})`
+                    transform: `rotate(${elem.rotate || 0}deg) scale(${elem.scaleX || 1}, ${elem.scaleY || 1})`,
+                    'z-index': index + 1,
+                    'border': `${elem.borderWidth}px solid #000`
                 }
             },
             elemClass(elem) {
@@ -376,7 +444,7 @@
                 elem.edit = false
             },
             editorClick(e) {
-                e.stopPropagation()
+//                e.stopPropagation()
                 e.preventDefault()
                 this.curElem = null
                 console.log('点击空白')
@@ -414,6 +482,24 @@
                 document.addEventListener('mouseup', mouseUp = e => {
                     this.selection.visible = false
                     console.log('up')
+                    document.removeEventListener('mousemove', mouseMove)
+                    document.removeEventListener('mouseup', mouseUp)
+                })
+            },
+            handlerMouseDown(e) {
+                let downX = e.pageX
+                let originAttrBoxWidth = this.attrBoxWidth
+                let mouseMove
+                let mouseUp
+                document.addEventListener('mousemove', mouseMove = e => {
+                    console.log('mousemove')
+                    this.attrBoxWidth = originAttrBoxWidth - (e.pageX - downX)
+                    let MIN_WIDTH = 320
+                    if (this.attrBoxWidth < MIN_WIDTH) {
+                        this.attrBoxWidth = MIN_WIDTH
+                    }
+                })
+                document.addEventListener('mouseup', mouseUp = e => {
                     document.removeEventListener('mousemove', mouseMove)
                     document.removeEventListener('mouseup', mouseUp)
                 })
@@ -528,7 +614,7 @@
                     height: 100
                 })
             },
-            addImage() {
+            addImage(image) {
                 this.elems.push({
                     id: new Date().getTime(),
                     type: 'image',
@@ -537,7 +623,7 @@
                     y: 100,
                     width: 100,
                     height: 100,
-                    image: 'https://ss0.bdstatic.com/5aV1bjqh_Q23odCf/static/superman/img/logo_top_ca79a146.png'
+                    image: image
                 })
             },
             doNothing() {},
@@ -641,7 +727,25 @@
             },
             flipY() {
                 this.curElem.scaleY *= -1
-            }
+            },
+            alignLeft() {
+                this.curElem.x = 0
+            },
+            alignRight() {
+                this.curElem.x = this.data.info.width - this.curElem.width
+            },
+            alignCenter() {
+                this.curElem.x = (this.data.info.width - this.curElem.width) / 2
+            },
+            alignTop() {
+                this.curElem.y = 0
+            },
+            alignBottom() {
+                this.curElem.y = this.data.info.height - this.curElem.height
+            },
+            alignMiddle() {
+                this.curElem.y = (this.data.info.height - this.curElem.height) / 2
+            },
         }
     }
 </script>

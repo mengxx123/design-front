@@ -1,46 +1,47 @@
 <template>
-    <div class="handler-box">
-        <div ref="resizeBox" class="resize-box" :style="handlerStyle"
-             @click.stop="click"
-             >
-            <!--{{ handlerType }}-->
-            <!--{{ data.width }}，-->
-            <!--{{ x }}，-->
-            <!--{{ y }}，-->
-            <!--{{ width }}，-->
-            <!--{{ height }}-->
-            <div class="center"
-                 @mousedown.top="handlerMouseDown($event, 'center')">
-            </div>
-            <!--<div class="handler handler-rotate"-->
-                 <!--@mousedown.top="handlerMouseDown($event, 'rotate')">-->
-            <!--</div>-->
-            <div class="handler handler-left"
-                 @mousedown.top="handlerMouseDown($event, 'left')">
-            </div>
-            <div class="handler handler-top"
-                 @mousedown.top="handlerMouseDown($event, 'top')">
-            </div>
-            <div class="handler handler-right"
-                 @mousedown.top="handlerMouseDown($event, 'right')">
-            </div>
-            <div class="handler handler-bottom"
-                 @mousedown.top="handlerMouseDown($event, 'bottom')">
-            </div>
-            <div class="handler handler-right-bottom"
-                 @mousedown.top="handlerMouseDown($event, 'right_bottom')">
-            </div>
-            <div class="handler handler-right-top"
-                 @mousedown.top="handlerMouseDown($event, 'right_top')">
-            </div>
-            <div class="handler handler-left-bottom"
-                 @mousedown.top="handlerMouseDown($event, 'left_bottom')">
-            </div>
-            <div class="handler handler-left-top"
-                 @mousedown.top="handlerMouseDown($event, 'left_top')">
-            </div>
+    <div ref="resizeBox" class="resize-box" :style="handlerStyle"
+         @click.stop="click"
+    >
+        <!--{{ handlerType }}-->
+        <!--{{ data.width }}，-->
+        <!--{{ x }}，-->
+        <!--{{ y }}，-->
+        <!--{{ width }}，-->
+        <!--{{ height }}-->
+        <div class="center"
+             @mousedown.top="handlerMouseDown($event, 'center')">
+        </div>
+        <!--<div class="handler handler-rotate"-->
+        <!--@mousedown.top="handlerMouseDown($event, 'rotate')">-->
+        <!--</div>-->
+        <div class="handler handler-left"
+             @mousedown.top="handlerMouseDown($event, 'left')">
+        </div>
+        <div class="handler handler-top"
+             @mousedown.top="handlerMouseDown($event, 'top')">
+        </div>
+        <div class="handler handler-right"
+             @mousedown.top="handlerMouseDown($event, 'right')">
+        </div>
+        <div class="handler handler-bottom"
+             @mousedown.top="handlerMouseDown($event, 'bottom')">
+        </div>
+        <div class="handler handler-right-bottom"
+             @mousedown.top="handlerMouseDown($event, 'right_bottom')">
+        </div>
+        <div class="handler handler-right-top"
+             @mousedown.top="handlerMouseDown($event, 'right_top')">
+        </div>
+        <div class="handler handler-left-bottom"
+             @mousedown.top="handlerMouseDown($event, 'left_bottom')">
+        </div>
+        <div class="handler handler-left-top"
+             @mousedown.top="handlerMouseDown($event, 'left_top')">
         </div>
     </div>
+    <!--<div class="handler-box">-->
+        <!---->
+    <!--</div>-->
 </template>
 
 <script>
